@@ -8,4 +8,4 @@ cp /lunarc/nobackup/projects/lu-haar/cifar10/* $SNIC_TMP
 export MXNET_CUDNN_AUTOTUNE_DEFAULT=1
 
 python -u train_resnet.py --data-dir $SNIC_TMP --data-type cifar10 --depth 164 \
-       --batch-size 128 --num-classes 10 --num-examples 50000 --gpus=0
+       --batch-size 128 --num-classes 10 --num-examples 50000 --epochs 20 --gpus=0

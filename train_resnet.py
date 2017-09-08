@@ -112,8 +112,7 @@ def main():
         symbol              = symbol,
         arg_params          = arg_params,
         aux_params          = aux_params,
-        # num_epoch           = 200 if args.data_type == "cifar10" else 120,
-        num_epoch           = 1 if args.data_type == "cifar10" else 120,
+        num_epoch           = args.epochs,
         begin_epoch         = begin_epoch,
         learning_rate       = args.lr,
         momentum            = args.mom,
@@ -161,12 +160,11 @@ if __name__ == "__main__":
     parser.add_argument('--model-load-epoch', type=int, default=0,
                         help='load the model on an epoch using the model-load-prefix')
     parser.add_argument('--frequent', type=int, default=50, help='frequency of logging')
+    parser.add_argument('--epochs', type=int, default=200, help='number of epochs')
     parser.add_argument('--memonger', action='store_true', default=False,
                         help='true means using memonger to save momory, https://github.com/dmlc/mxnet-memonger')
     parser.add_argument('--retrain', action='store_true', default=False, help='true means continue training')
     args = parser.parse_args()
     logging.info(args)
 
-    # main()
-    import cProfile
-    cProfile.run("main()")
+    main()
