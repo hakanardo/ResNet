@@ -93,6 +93,7 @@ def main():
         rand_mirror         = True,
         shuffle             = True,
         num_parts           = kv.num_workers,
+        preprocess_threads  = len(devs) * 5,
         part_index          = kv.rank)
     val = mx.io.ImageRecordIter(
         path_imgrec         = os.path.join(args.data_dir, "cifar10_val.rec") if args.data_type == 'cifar10' else
