@@ -10,4 +10,4 @@ export MXNET_CUDNN_AUTOTUNE_DEFAULT=1
 #export GOMP_CPU_AFFINITY="0-19:2"
 
 python -u train_resnet.py --data-dir $SNIC_TMP --data-type cifar10 --depth 164 \
-       --batch-size 512 --num-classes 10 --num-examples 50000 --kv-store local --epochs 20 --gpus=0,1,2,3
+       --batch-size 128 --num-classes 10 --num-examples 50000 --kv-store local --epochs 20 --gpus=0,1,2,3
