@@ -6,6 +6,7 @@ void main() {
     maxthread = omp_get_num_procs() / 2 - 1;
   }
   printf("%d\n", maxthread);
+  if (maxthread < 1) maxthread=1;
   int preprocess_threads = maxthread;
   #pragma omp parallel num_threads(preprocess_threads)
   {
