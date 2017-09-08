@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 #SBATCH -t 48:00:00
 #SBATCH -N 1
-#SBATCH -p gpu --gres=gpu:2 --mem-per-cpu=6200 -tasks-per-node=10
+#SBATCH -p gpu --gres=gpu:2 --mem-per-cpu=3100 -tasks-per-node=10
 
 export MXNET_CUDNN_AUTOTUNE_DEFAULT=1
 
