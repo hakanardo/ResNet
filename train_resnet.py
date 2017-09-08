@@ -113,7 +113,7 @@ def main():
         arg_params          = arg_params,
         aux_params          = aux_params,
         # num_epoch           = 200 if args.data_type == "cifar10" else 120,
-        num_epoch           = 20 if args.data_type == "cifar10" else 120,
+        num_epoch           = 1 if args.data_type == "cifar10" else 120,
         begin_epoch         = begin_epoch,
         learning_rate       = args.lr,
         momentum            = args.mom,
@@ -166,4 +166,7 @@ if __name__ == "__main__":
     parser.add_argument('--retrain', action='store_true', default=False, help='true means continue training')
     args = parser.parse_args()
     logging.info(args)
-    main()
+
+    # main()
+    import cProfile
+    cProfile.run("main()")
