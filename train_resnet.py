@@ -32,7 +32,9 @@ def main():
                         memonger=args.memonger)
     elif args.data_type == "imagenet":
         args.num_classes = 1000
-        if args.depth == 18:
+        if args.depth == 9:
+            units = [1, 1, 1, 1]
+        elif args.depth == 18:
             units = [2, 2, 2, 2]
         elif args.depth == 34:
             units = [3, 4, 6, 3]
@@ -55,7 +57,7 @@ def main():
     else:
          raise ValueError("do not support {} yet".format(args.data_type))
     kv = mx.kvstore.create(args.kv_store)
-    devs = mx.cpu() if args.gpus is None else [mx.gpu(int(i)) for i in args.gpus.split(',')]
+    devs = [mx.cpu()] if args.gpus is None else [mx.gpu(int(i)) for i in args.gpus.split(',')]
     epoch_size = max(int(args.num_examples / args.batch_size / kv.num_workers), 1)
     begin_epoch = args.model_load_epoch if args.model_load_epoch else 0
     if not os.path.exists("./model"):
@@ -137,7 +139,7 @@ def main():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="command for training resnet-v2")
-    parser.add_argument('--gpus', type=str, default='0', help='the gpus will be used, e.g "0,1,2,3"')
+    parser.add_argument('--gpus', type=str, default=None, help='the gpus will be used, e.g "0,1,2,3"')
     parser.add_argument('--data-dir', type=str, default='./data/imagenet/', help='the input data directory')
     parser.add_argument('--data-type', type=str, default='imagenet', help='the dataset type')
     parser.add_argument('--list-dir', type=str, default='./',
