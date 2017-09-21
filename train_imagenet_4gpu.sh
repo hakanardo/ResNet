@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-#SBATCH -t 48:00:00
+#SBATCH -t 100:00:00
 #SBATCH -N 1
-#SBATCH -p gpu --gres=gpu:4 --mem-per-cpu=3100 -tasks-per-node=20
+#SBATCH -p gpu --gres=gpu:4
 #SBATCH --exclusive
 
 cp /lunarc/nobackup/projects/lu-haar/imagenet/{val_256_q90,train_480_q90}.* $SNIC_TMP

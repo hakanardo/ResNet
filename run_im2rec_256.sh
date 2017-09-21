@@ -4,5 +4,5 @@
 #SBATCH -p gpu --gres=gpu:1 --exclusive
 
 cd /lunarc/nobackup/projects/lu-haar/imagenet/
-python /lunarc/nobackup/users/hakanardo/miniconda2/lib/python2.7/site-packages/mxnet/tools/im2rec.py \
+python -u /lunarc/nobackup/users/hakanardo/miniconda2/lib/python2.7/site-packages/mxnet/tools/im2rec.py \
     --resize 256 --quality  90 train ILSVRC2012_img_train/ --num-thread 4
