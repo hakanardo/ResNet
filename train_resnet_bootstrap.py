@@ -134,7 +134,9 @@ def main():
         X                  = BootstrapIter(train),
         eval_data          = val,
         eval_metric        = ['acc', 'ce'] if args.data_type=='cifar10' else
-                            [BAccuracy(name='acc'), BTopKAccuracy(name='top_k_accuracy', top_k=5),  BootstrapMetric('bs')],
+                            [BAccuracy(name='acc', label_names=['softmax_label'], output_names=['data']),
+                             BTopKAccuracy(name='top_k_accuracy', top_k=5, label_names=['softmax_label'], output_names=['data']),
+                             BootstrapMetric('bs')],
         kvstore            = kv,
         batch_end_callback = mx.callback.Speedometer(args.batch_size, args.frequent),
         epoch_end_callback = checkpoint)
