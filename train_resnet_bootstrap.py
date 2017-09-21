@@ -2,6 +2,7 @@ import argparse,logging,os
 import mxnet as mx
 from symbol_resnet import resnet
 import mxnet.metric
+import numpy as np
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -130,13 +131,14 @@ def main():
                              if args.data_type=='cifar10' else
                              multi_factor_scheduler(begin_epoch, epoch_size, step=[30, 60, 90], factor=0.1),
         )
+    bootstrap_metric = BootstrapMetric()
     model.fit(
-        X                  = BootstrapIter(train),
+        X                  = BootstrapIter(train, bootstrap_metric),
         eval_data          = val,
         eval_metric        = ['acc', 'ce'] if args.data_type=='cifar10' else
                             [BAccuracy(name='acc', label_names=['softmax_label'], output_names=['data']),
                              BTopKAccuracy(name='top_k_accuracy', top_k=5, label_names=['softmax_label'], output_names=['data']),
-                             BootstrapMetric('bs')],
+                             bootstrap_metric],
         kvstore            = kv,
         batch_end_callback = mx.callback.Speedometer(args.batch_size, args.frequent),
         epoch_end_callback = checkpoint)
@@ -144,13 +146,14 @@ def main():
     #               eval_metric = ['acc', mx.metric.create('top_k_accuracy', top_k = 5)])))
 
 class BootstrapIter(mx.io.DataIter):
-    def __init__(self, image_iter):
+    def __init__(self, image_iter, bootstrap_metric):
         self.image_iter = image_iter
         self.batch_size = image_iter.batch_size
+        self.bootstrap_metric = bootstrap_metric
 
     def next(self):
         b = self.image_iter.next()
-        ids = b.label[0][:,1]
+        ids = b.label[0][:,1].astype(int)
         labels = b.label[0][:,0]
         return mxnet.io.DataBatch(b.data, [labels, ids], b.pad)
 
@@ -177,9 +180,20 @@ class BTopKAccuracy(mx.metric.TopKAccuracy):
         return mx.metric.TopKAccuracy.update(self, [labels[0]], [preds[0]])
 
 class BootstrapMetric(mx.metric.EvalMetric):
+    def __init__(self, maxid=100):
+        mx.metric.EvalMetric.__init__(self, "bs")
+        self.pok = np.zeros(maxid, np.float32)
+        self.alfa = 0.5
+
     def update(self, labels, preds):
         if len(labels) == 2: # If we are training and not validating
-            print('M', len(labels), labels[0].shape, labels[1], preds[0].shape)
+            ids = labels[1].asnumpy()
+            labels = labels[0].asnumpy()
+            preds = preds[0].asnumpy()
+            self.pok[ids] = self.alfa * self.pok[ids] + (1-self.alfa) * (np.argmax(preds, axis=1) == labels)
+
+    def get(self):
+        return ["bs_0.1", "bs_0.5", "bs_0.9"], map(int, [np.sum(self.pok > 0.1), np.sum(self.pok > 0.5), np.sum(self.pok > 0.9)])
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="command for training resnet-v2")
