@@ -63,7 +63,7 @@ def residual_unit(data, num_filter, stride, dim_match, name, bottle_neck=True, b
             shortcut._set_attr(mirror_stage='True')
         return conv2 + shortcut
 
-def resnet(units, num_stage, filter_list, num_class, data_type, bottle_neck=True, bn_mom=0.9, workspace=512, memonger=False):
+def resnet(units, num_stage, filter_list, num_class, data_type, bottle_neck=True, bn_mom=0.9, workspace=512, memonger=False, label=None):
     """Return ResNet symbol of cifar10 and imagenet
     Parameters
     ----------
@@ -108,4 +108,4 @@ def resnet(units, num_stage, filter_list, num_class, data_type, bottle_neck=True
     pool1 = mx.symbol.Pooling(data=relu1, global_pool=True, kernel=(7, 7), pool_type='avg', name='pool1')
     flat = mx.symbol.Flatten(data=pool1)
     fc1 = mx.symbol.FullyConnected(data=flat, num_hidden=num_class, name='fc1')
-    return mx.symbol.SoftmaxOutput(data=fc1, name='softmax')
+    return mx.symbol.SoftmaxOutput(data=fc1, name='softmax', label=label)

@@ -1,6 +1,7 @@
 import argparse,logging,os
 import mxnet as mx
 from symbol_resnet import resnet
+import mxnet.metric
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -50,10 +51,13 @@ def main():
             units = [3, 30, 48, 8]
         else:
             raise ValueError("no experiments done on detph {}, you can do it youself".format(args.depth))
+        label = mx.sym.Variable(name='softmax_label')
+        ids = mx.sym.Variable(name='softmax_label_ids')
         symbol = resnet(units=units, num_stage=4, filter_list=[64, 256, 512, 1024, 2048] if args.depth >=50
                         else [64, 64, 128, 256, 512], num_class=args.num_classes, data_type="imagenet", bottle_neck = True
                         if args.depth >= 50 else False, bn_mom=args.bn_mom, workspace=args.workspace,
-                        memonger=args.memonger)
+                        memonger=args.memonger, label=label)
+        symbol = mx.sym.Group([symbol, ids])
     else:
          raise ValueError("do not support {} yet".format(args.data_type))
     kv = mx.kvstore.create(args.kv_store)
@@ -62,7 +66,7 @@ def main():
     begin_epoch = args.model_load_epoch if args.model_load_epoch else 0
     if not os.path.exists("./model"):
         os.mkdir("./model")
-    model_prefix = "model/resnet-{}-{}-{}".format(args.data_type, args.depth, kv.rank)
+    model_prefix = "model/resnet-bootstrapped-{}-{}-{}".format(args.data_type, args.depth, kv.rank)
     checkpoint = mx.callback.do_checkpoint(model_prefix)
     arg_params = None
     aux_params = None
@@ -73,10 +77,10 @@ def main():
         symbol = memonger.search_plan(symbol, data=(args.batch_size, 3, 32, 32) if args.data_type=="cifar10"
                                                     else (args.batch_size, 3, 224, 224))
     train = mx.io.ImageRecordIter(
-        path_imgrec         = os.path.join(args.data_dir, "cifar10_train.rec") if args.data_type == 'cifar10' else
-                              os.path.join(args.data_dir, "train_256_q90.rec") if args.aug_level == 1
-                              else os.path.join(args.data_dir, "train_480_q90.rec"),
-        label_width         = 1,
+        path_imgrec         = os.path.join(args.data_dir, "cifar10_train_ids.rec") if args.data_type == 'cifar10' else
+                              os.path.join(args.data_dir, "train_256_q90_ids.rec") if args.aug_level == 1
+                              else os.path.join(args.data_dir, "train_480_q90_ids.rec"),
+        label_width         = 2,
         data_name           = 'data',
         label_name          = 'softmax_label',
         data_shape          = (3, 32, 32) if args.data_type=="cifar10" else (3, 224, 224),
@@ -127,15 +131,53 @@ def main():
                              multi_factor_scheduler(begin_epoch, epoch_size, step=[30, 60, 90], factor=0.1),
         )
     model.fit(
-        X                  = train,
+        X                  = BootstrapIter(train),
         eval_data          = val,
         eval_metric        = ['acc', 'ce'] if args.data_type=='cifar10' else
-                             ['acc', mx.metric.create('top_k_accuracy', top_k = 5)],
+                            [BAccuracy(name='acc'), BTopKAccuracy(name='top_k_accuracy', top_k=5),  BootstrapMetric('bs')],
         kvstore            = kv,
         batch_end_callback = mx.callback.Speedometer(args.batch_size, args.frequent),
         epoch_end_callback = checkpoint)
     # logging.info("top-1 and top-5 acc is {}".format(model.score(X = val,
     #               eval_metric = ['acc', mx.metric.create('top_k_accuracy', top_k = 5)])))
+
+class BootstrapIter(mx.io.DataIter):
+    def __init__(self, image_iter):
+        self.image_iter = image_iter
+        self.batch_size = image_iter.batch_size
+
+    def next(self):
+        b = self.image_iter.next()
+        ids = b.label[0][:,1]
+        labels = b.label[0][:,0]
+        return mxnet.io.DataBatch(b.data, [labels, ids], b.pad)
+
+    def reset(self):
+        self.image_iter.reset()
+
+    @property
+    def provide_data(self):
+        return self.image_iter.provide_data
+
+    @property
+    def provide_label(self):
+        d, = self.image_iter.provide_label
+        return [mx.io.DataDesc(d.name, (d.shape[0],), d.dtype, d.layout),
+                mx.io.DataDesc(d.name+'_ids', (d.shape[0],), d.dtype, d.layout)]
+
+
+class BAccuracy(mx.metric.Accuracy):
+    def update(self, labels, preds):
+        return mx.metric.Accuracy.update(self, [labels[0]], [preds[0]])
+
+class BTopKAccuracy(mx.metric.TopKAccuracy):
+    def update(self, labels, preds):
+        return mx.metric.TopKAccuracy.update(self, [labels[0]], [preds[0]])
+
+class BootstrapMetric(mx.metric.EvalMetric):
+    def update(self, labels, preds):
+        if len(labels) == 2: # If we are training and not validating
+            print('M', len(labels), labels[0].shape, labels[1], preds[0].shape)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="command for training resnet-v2")
