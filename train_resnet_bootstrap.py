@@ -1,4 +1,6 @@
 import argparse,logging,os
+from random import random
+
 import mxnet as mx
 from symbol_resnet import resnet
 import mxnet.metric
@@ -85,7 +87,7 @@ def main():
         data_name           = 'data',
         label_name          = 'softmax_label',
         data_shape          = (3, 32, 32) if args.data_type=="cifar10" else (3, 224, 224),
-        batch_size          = args.batch_size,
+        batch_size          = 1,
         pad                 = 4 if args.data_type == "cifar10" else 0,
         fill_value          = 127,  # only used when pad is valid
         rand_crop           = True,
@@ -115,6 +117,7 @@ def main():
         num_parts           = kv.num_workers,
         part_index          = kv.rank)
     model = mx.model.FeedForward(
+        epoch_size          = 15,
         ctx                 = devs,
         symbol              = symbol,
         arg_params          = arg_params,
@@ -133,7 +136,7 @@ def main():
         )
     bootstrap_metric = BootstrapMetric()
     model.fit(
-        X                  = BootstrapIter(train, bootstrap_metric),
+        X                  = BootstrapIter(train, args.batch_size, bootstrap_metric),
         eval_data          = val,
         eval_metric        = ['acc', 'ce'] if args.data_type=='cifar10' else
                             [BAccuracy(name='acc', label_names=['softmax_label'], output_names=['data']),
@@ -146,29 +149,43 @@ def main():
     #               eval_metric = ['acc', mx.metric.create('top_k_accuracy', top_k = 5)])))
 
 class BootstrapIter(mx.io.DataIter):
-    def __init__(self, image_iter, bootstrap_metric):
+    def __init__(self, image_iter, batch_size, bootstrap_metric):
         self.image_iter = image_iter
         self.batch_size = image_iter.batch_size
         self.bootstrap_metric = bootstrap_metric
+        self.batch_size = batch_size
+        self.data_shape = (batch_size,) + self.image_iter.provide_data[0].shape[1:]
 
     def next(self):
-        b = self.image_iter.next()
-        ids = b.label[0][:,1].astype(int)
-        labels = b.label[0][:,0]
-        return mxnet.io.DataBatch(b.data, [labels, ids], b.pad)
+        pok = self.bootstrap_metric.pok
+        data = mx.nd.empty(self.data_shape)
+        labels = mx.nd.empty(self.batch_size)
+        ids = mx.nd.empty(self.batch_size, dtype=int)
+        i = 0
+        while i < self.batch_size:
+            b = self.image_iter.next()
+            sample_id = int(b.label[0][:,1].asscalar())
+            if random() < pok[sample_id] * 0.5:
+                continue
+            ids[i] = sample_id
+            labels[i] = b.label[0][:,0]
+            data[i] = b.data[0][0]
+            i += 1
+        return mxnet.io.DataBatch([data], [labels, ids], self.batch_size - i)
 
     def reset(self):
         self.image_iter.reset()
 
     @property
     def provide_data(self):
-        return self.image_iter.provide_data
+        d, =  self.image_iter.provide_data
+        return [mx.io.DataDesc(d.name, self.data_shape, d.dtype, d.layout),]
 
     @property
     def provide_label(self):
         d, = self.image_iter.provide_label
-        return [mx.io.DataDesc(d.name, (d.shape[0],), d.dtype, d.layout),
-                mx.io.DataDesc(d.name+'_ids', (d.shape[0],), d.dtype, d.layout)]
+        return [mx.io.DataDesc(d.name, (self.batch_size,), d.dtype, d.layout),
+                mx.io.DataDesc(d.name+'_ids', (self.batch_size,), d.dtype, d.layout)]
 
 
 class BAccuracy(mx.metric.Accuracy):
