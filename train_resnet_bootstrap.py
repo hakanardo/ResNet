@@ -16,6 +16,8 @@ def multi_factor_scheduler(begin_epoch, epoch_size, step=[60, 75, 90], factor=0.
 
 
 def main():
+    num_examples = 1281167
+
     if args.data_type == "cifar10":
         args.aug_level = 1
         args.num_classes = 10
@@ -117,7 +119,7 @@ def main():
         num_parts           = kv.num_workers,
         part_index          = kv.rank)
     model = mx.model.FeedForward(
-        epoch_size          = 15,
+        epoch_size          = num_examples // args.batch_size + 1,
         ctx                 = devs,
         symbol              = symbol,
         arg_params          = arg_params,
@@ -134,7 +136,7 @@ def main():
                              if args.data_type=='cifar10' else
                              multi_factor_scheduler(begin_epoch, epoch_size, step=[30, 60, 90], factor=0.1),
         )
-    bootstrap_metric = BootstrapMetric()
+    bootstrap_metric = BootstrapMetric(num_examples)
     model.fit(
         X                  = BootstrapIter(train, args.batch_size, bootstrap_metric),
         eval_data          = val,
