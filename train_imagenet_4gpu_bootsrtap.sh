@@ -4,7 +4,7 @@
 #SBATCH -p gpu --gres=gpu:4
 #SBATCH --exclusive
 
-cp /lunarc/nobackup/projects/lu-haar/imagenet/{val_256_q90,train_480_q90}.* $SNIC_TMP
+cp /lunarc/nobackup/projects/lu-haar/imagenet/{val_256_q90,train_480_q90_ids}.* $SNIC_TMP
 
 export MXNET_CUDNN_AUTOTUNE_DEFAULT=1
 
