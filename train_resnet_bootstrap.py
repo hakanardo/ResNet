@@ -162,7 +162,7 @@ class BootstrapIter(mx.io.DataIter):
         pok = self.bootstrap_metric.pok
         data = mx.nd.empty(self.data_shape)
         labels = mx.nd.empty(self.batch_size)
-        ids = mx.nd.empty(self.batch_size, dtype=int)
+        ids = mx.nd.empty(self.batch_size)
         i = 0
         while i < self.batch_size:
             b = self.image_iter.next()
@@ -206,7 +206,7 @@ class BootstrapMetric(mx.metric.EvalMetric):
 
     def update(self, labels, preds):
         if len(labels) == 2: # If we are training and not validating
-            ids = labels[1].asnumpy()
+            ids = labels[1].asnumpy().astype(int)
             labels = labels[0].asnumpy()
             preds = preds[0].asnumpy()
             self.pok[ids] = self.alfa * self.pok[ids] + (1-self.alfa) * (np.argmax(preds, axis=1) == labels)
